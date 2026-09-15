@@ -1,31 +1,38 @@
 package com.sendformat.noformat;
 
+import android.util.Log;
 import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 
 public class NoFormatPlugin {
 
-    public static final String TAG = "NoFormatPlugin";
+    public static final String TAG = "NoFormat";
     public static volatile boolean skipNextFormat = false;
 
+    private static void log(String msg) {
+        Log.d(TAG, msg);
+    }
+
     public static void start() {
+        log("start() called");
         try {
             ClassLoader cl = getAppClassLoader();
             if (cl == null) {
-                XposedBridge.log(TAG + ": classloader == null");
+                log("classloader == null");
                 return;
             }
+            log("classloader = " + cl);
             hookSetItemOptions(cl);
-            XposedBridge.log(TAG + ": started");
+            log("started OK");
         } catch (Throwable t) {
-            XposedBridge.log(TAG + ": start error: " + t);
+            log("start error: " + t);
+            t.printStackTrace();
         }
     }
 
     public static void stop() {
         skipNextFormat = false;
-        XposedBridge.log(TAG + ": stopped");
+        log("stopped");
     }
 
     private static ClassLoader getAppClassLoader() {
@@ -35,16 +42,18 @@ public class NoFormatPlugin {
             if (ctx != null) {
                 return ctx.getClass().getClassLoader();
             }
+            log("applicationContext == null");
         } catch (Throwable t) {
-            XposedBridge.log(TAG + ": getAppClassLoader: " + t);
+            log("getAppClassLoader error: " + t);
         }
         return NoFormatPlugin.class.getClassLoader();
     }
 
     private static void hookSetItemOptions(ClassLoader cl) {
         try {
-            Class<?> itemOptionsClass = XposedHelpers.findClass(
+            final Class<?> itemOptionsClass = XposedHelpers.findClass(
                     "org.telegram.ui.Components.ItemOptions", cl);
+            log("ItemOptions class found: " + itemOptionsClass);
 
             XposedHelpers.findAndHookMethod(
                     "org.telegram.ui.MessageSendPreview",
@@ -54,18 +63,23 @@ public class NoFormatPlugin {
                     new XC_MethodHook() {
                         @Override
                         protected void afterHookedMethod(MethodHookParam param) {
+                            log("setItemOptions called!");
                             try {
                                 Object options = param.args[0];
-                                if (options == null) return;
+                                if (options == null) {
+                                    log("options == null");
+                                    return;
+                                }
                                 addItem(options);
                             } catch (Throwable t) {
-                                XposedBridge.log(TAG + ": afterHook: " + t);
+                                log("afterHook error: " + t);
                             }
                         }
                     });
-            XposedBridge.log(TAG + ": hook installed on setItemOptions");
+            log("hook installed on setItemOptions");
         } catch (Throwable t) {
-            XposedBridge.log(TAG + ": hookSetItemOptions error: " + t);
+            log("hookSetItemOptions error: " + t);
+            t.printStackTrace();
         }
     }
 
@@ -75,17 +89,19 @@ public class NoFormatPlugin {
                 @Override
                 public void run() {
                     skipNextFormat = true;
-                    XposedBridge.log(TAG + ": skip flag ON");
+                    log("skip flag ON");
                 }
             };
 
-            // Ищем подходящую перегрузку add(...)
             Class<?> cls = options.getClass();
+            log("options class = " + cls.getName());
+
             java.lang.reflect.Method best = null;
             int bestScore = -1;
             for (java.lang.reflect.Method m : cls.getMethods()) {
                 if (!m.getName().equals("add")) continue;
                 Class<?>[] p = m.getParameterTypes();
+                log("add candidate: " + m + " params=" + p.length);
                 if (p.length < 4) continue;
                 if (p[1] != CharSequence.class) continue;
                 int score = p.length;
@@ -96,24 +112,26 @@ public class NoFormatPlugin {
             }
 
             if (best == null) {
-                XposedBridge.log(TAG + ": add(...) not found");
+                log("add(...) not found");
                 return;
             }
 
             int n = best.getParameterTypes().length;
+            log("chosen add arity=" + n);
             Object[] args;
             if (n == 5) {
                 args = new Object[]{0, "Отправить без форматирования", 0, 0, click};
             } else if (n == 4) {
                 args = new Object[]{0, "Отправить без форматирования", 0, click};
             } else {
-                XposedBridge.log(TAG + ": unsupported add arity=" + n);
+                log("unsupported add arity=" + n);
                 return;
             }
             best.invoke(options, args);
-            XposedBridge.log(TAG + ": item added (arity=" + n + ")");
+            log("item added OK (arity=" + n + ")");
         } catch (Throwable t) {
-            XposedBridge.log(TAG + ": addItem error: " + t);
+            log("addItem error: " + t);
+            t.printStackTrace();
         }
     }
 }
