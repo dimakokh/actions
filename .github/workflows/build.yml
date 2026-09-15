@@ -22,20 +22,19 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: ''          # ← вот это исправляет ошибку
+          packages: ''
           log-accepted-android-sdk-licenses: false
 
       - name: Install build-tools 34
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager "build-tools;34.0.0" "platforms;android-34"
-          echo "$ANDROID_HOME/build-tools/34.0.0" >> $GITHUB_PATH
 
-      - name: Download Xposed API
+      - name: Verify Xposed JAR exists
         run: |
-          mkdir -p libs
-          curl -L -o libs/XposedBridgeAPI-82.jar \
-            https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar
+          ls -la libs/XposedBridgeAPI-82.jar
+          file libs/XposedBridgeAPI-82.jar
+          unzip -l libs/XposedBridgeAPI-82.jar | head -5
 
       - name: Compile Java
         run: |
@@ -57,7 +56,6 @@ jobs:
         run: |
           base64 -w0 dex_out/classes.dex > dex_b64.txt
           echo "DEX size: $(wc -c < dex_out/classes.dex) bytes"
-          echo "Base64 size: $(wc -c < dex_b64.txt) chars"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
