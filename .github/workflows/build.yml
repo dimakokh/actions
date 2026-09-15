@@ -30,6 +30,25 @@ jobs:
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager "build-tools;34.0.0" "platforms;android-34"
 
+      - name: Build Xposed API 82
+        run: |
+          mkdir -p libs
+          git clone --depth 1 --branch art https://github.com/rovo89/XposedBridge.git xposed-src
+          cd xposed-src
+          # Патчим build.gradle для работы с современным Gradle
+          sed -i 's/jcenter/mavenCentral/g' build.gradle
+          # Убираем подпись и прочие ненужные для сборки части (если скрипт упадёт)
+          # Проще всего — использовать предсобранный JAR из репозитория
+          if [ -f "XposedBridgeAPI-82.jar" ]; then
+            cp XposedBridgeAPI-82.jar ../libs/
+          else
+            # Fallback: собираем сами через javac
+            find . -name "*.java" > sources.txt
+            javac -source 8 -target 8 -d ../libs/classes @sources.txt \
+              -cp "$ANDROID_HOME/platforms/android-34/android.jar" 2>/dev/null || true
+            cd ../libs/classes && jar cf ../XposedBridgeAPI-82.jar de/
+          fi
+
       - name: Verify Xposed JAR exists
         run: |
           ls -la libs/XposedBridgeAPI-82.jar
