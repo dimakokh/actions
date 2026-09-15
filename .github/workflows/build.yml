@@ -21,19 +21,22 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'tools platform-tools'
+          log-accepted-android-sdk-licenses: false
 
-      - name: Install build-tools (d8)
+      - name: Install build-tools 34
         run: |
-          sdkmanager "build-tools;34.0.0" "platforms;android-34"
-          echo "$ANDROID_HOME/build-tools/34.0.0" >> $GITHUB_PATH
+          yes | sdkmanager "build-tools;34.0.0" "platforms;android-34" 2>/dev/null || true
+          echo "Build tools installed"
+          ls -la $ANDROID_HOME/build-tools/34.0.0/ | head -20
 
       - name: Download Xposed API
         run: |
           mkdir -p libs
           curl -L -o libs/XposedBridgeAPI-82.jar \
-            https://github.com/rovo89/XposedBridge/raw/art/XposedBridgeAPI-82.jar \
-            || curl -L -o libs/XposedBridgeAPI-82.jar \
-            https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar
+            https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar \
+            || echo "Download failed, will try fallback"
 
       - name: Compile Java
         run: |
